@@ -1,0 +1,82 @@
+# CandidateProfile Master Configuration
+# Source of truth for candidate data and application preferences
+
+identity:
+  name: "Bruno Moya"
+  email: "bruno.moya@example.com"
+  phone: "+34 600 000 000"
+  location: "Barcelona, Spain"
+  linkedin: "https://linkedin.com/in/brunomoya"
+  github: "https://github.com/brunomoya"
+  website: "https://brunomoya.dev"
+
+job_preferences:
+  locations:
+    - "Spain"
+    - "Barcelona"
+    - "Europe"
+    - "European Union"
+    - "Remote (EU)"
+    - "Remote (Worldwide)"
+    - "United States (Remote/Visa)"
+  remote: true
+  hybrid: true
+  onsite: false
+
+  roles:
+    - "Software Engineer"
+    - "XR Engineer"
+    - "AR/VR Engineer"
+    - "Unity Developer"
+    - "Technical Lead"
+    - "CTO"
+    - "Founding Engineer"
+    - "Computer Vision Engineer"
+    - "Spatial Computing Architect"
+
+  interests:
+    - "XR"
+    - "AR"
+    - "VR"
+    - "spatial computing"
+    - "computer vision"
+    - "AI"
+    - "developer tools"
+    - "startups"
+    - "real-time graphics"
+
+  minimum_salary: 85000
+  preferred_salary: 110000
+  currencies:
+    - "EUR"
+    - "USD"
+    - "GBP"
+  relocation: false
+  visa_requirements:
+    authorized_eu: true
+    authorized_us: false
+    requires_sponsorship_us: true
+    requires_sponsorship_eu: false
+
+application_preferences:
+  execution_mode: "AUTO_APPLY" # DISCOVERY_ONLY | PREPARE | REVIEW_BEFORE_SUBMIT | AUTO_APPLY
+  auto_apply_threshold: 82
+  prepare_threshold: 65
+  maximum_daily_applications: 10
+  allowed_sources:
+    - "greenhouse"
+    - "lever"
+    - "ashby"
+    - "company-careers"
+    - "generic-web"
+  excluded_companies: []
+  excluded_roles:
+    - "Intern"
+    - "Junior"
+  require_salary_match: false
+  require_remote_match: true
+  follow_up_days: 7
+
+reactive_resume:
+  master_resume_id: "" # Populated from environment or discovered via name
+  master_resume_name: "Bruno Moya — Master CV"

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lever Test Job Application</title>
+</head>
+<body>
+  <div class="lever-job-posting">
+    <form id="application-form">
+      <div>
+        <label>Full Name</label>
+        <input type="text" name="name" required />
+      </div>
+      <div>
+        <label>Email</label>
+        <input type="email" name="email" required />
+      </div>
+      <div>
+        <label>Phone</label>
+        <input type="tel" name="phone" required />
+      </div>
+      <div>
+        <label>Current Company</label>
+        <input type="text" name="org" />
+      </div>
+      <div>
+        <label>Resume</label>
+        <input type="file" id="resume-upload-input" name="resume" required />
+      </div>
+      <button type="button" class="template-btn-submit" onclick="document.body.innerHTML = '<h1>Thank you for applying</h1><p>Application received</p>'">
+        Submit Application
+      </button>
+    </form>
+  </div>
+</body>
+</html>
