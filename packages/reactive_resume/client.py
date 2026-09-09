@@ -146,7 +146,12 @@ class ReactiveResumeClient:
             "tags": tags or [],
         }
         resp = await self._request("POST", f"/resumes/{resume_id}/duplicate", json_data=body)
-        return ResumeDetail.model_validate(resp.json())
+        data = resp.json()
+        if isinstance(data, str):
+            return await self.get_resume(data)
+        elif isinstance(data, dict) and "data" not in data and "id" in data:
+            return await self.get_resume(data["id"])
+        return ResumeDetail.model_validate(data)
 
     async def patch_resume(
         self,
@@ -219,7 +224,12 @@ class ReactiveResumeClient:
         if data.followUpAt:
             body["followUpAt"] = data.followUpAt.isoformat()
         resp = await self._request("POST", "/applications", json_data=body)
-        return ApplicationResponse.model_validate(resp.json())
+        resp_data = resp.json()
+        if isinstance(resp_data, str):
+            return await self.get_application(resp_data)
+        elif isinstance(resp_data, dict) and "company" not in resp_data and "id" in resp_data:
+            return await self.get_application(resp_data["id"])
+        return ApplicationResponse.model_validate(resp_data)
 
     async def get_application(self, application_id: str) -> ApplicationResponse:
         resp = await self._request("GET", f"/applications/{application_id}")
@@ -269,7 +279,7 @@ class ReactiveResumeClient:
         resp = await self._request(
             "POST",
             f"/applications/{application_id}/notes",
-            json_data={"note": note}
+            json_data={"text": note}
         )
         return resp.json()
 

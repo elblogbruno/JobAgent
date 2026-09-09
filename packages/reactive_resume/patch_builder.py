@@ -10,7 +10,7 @@ class ResumePatchBuilder:
         self.operations.append(
             JsonPatchOperation(
                 op="replace",
-                path="/data/basics/headline",
+                path="/basics/headline",
                 value=new_headline
             )
         )
@@ -20,7 +20,7 @@ class ResumePatchBuilder:
         self.operations.append(
             JsonPatchOperation(
                 op="replace",
-                path="/data/sections/summary/content",
+                path="/sections/summary/content",
                 value=new_summary_html_or_text
             )
         )
@@ -30,7 +30,7 @@ class ResumePatchBuilder:
         self.operations.append(
             JsonPatchOperation(
                 op="replace",
-                path=f"/data/sections/experience/items/{index}/summary",
+                path=f"/sections/experience/items/{index}/summary",
                 value=summary_html
             )
         )
@@ -40,7 +40,7 @@ class ResumePatchBuilder:
         self.operations.append(
             JsonPatchOperation(
                 op="replace",
-                path="/data/sections/skills/items",
+                path="/sections/skills/items",
                 value=skills_items
             )
         )
@@ -50,7 +50,7 @@ class ResumePatchBuilder:
         self.operations.append(
             JsonPatchOperation(
                 op="replace",
-                path="/data/sections/experience/items",
+                path="/sections/experience/items",
                 value=reordered_items
             )
         )
