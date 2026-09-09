@@ -3,12 +3,12 @@
 
 identity:
   name: "Bruno Moya"
-  email: "bruno.moya@example.com"
-  phone: "+34 600 000 000"
-  location: "Barcelona, Spain"
+  email: "bruno.moya@glassear.com"
+  phone: "+34 633 860 821"
+  location: "Santpedor, Barcelona, Spain"
   linkedin: "https://linkedin.com/in/brunomoya"
   github: "https://github.com/brunomoya"
-  website: "https://brunomoya.dev"
+  website: "https://glassear.com"
 
 job_preferences:
   locations:
@@ -78,5 +78,5 @@ application_preferences:
   follow_up_days: 7
 
 reactive_resume:
-  master_resume_id: "" # Populated from environment or discovered via name
-  master_resume_name: "Bruno Moya — Master CV"
+  master_resume_id: "019befd7-8cda-711c-88ca-1e18f9d65ed1"
+  master_resume_name: "English CV"
