@@ -1,9 +1,9 @@
 # Environment & Secrets
 .env
-.env.local
-.env.*.local
+.env*
 *.pem
 *.key
+*.sql
 
 # Python
 __pycache__/
