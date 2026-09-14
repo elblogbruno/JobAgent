@@ -33,11 +33,13 @@ import {
   FileText,
   Download,
   Wand2,
+  LogOut,
 } from 'lucide-react';
 
 import RoleDiscovery from './RoleDiscovery';
 import ResumeLibrary from './ResumeLibrary';
 import OutcomeControls, { OutcomeEntry } from './OutcomeControls';
+import LoginScreen from './LoginScreen';
 
 interface Job {
   id: string;
@@ -167,6 +169,11 @@ interface LLMConfigData {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'roles' | 'jobs' | 'applications' | 'resumes' | 'vault' | 'profile' | 'llm'>('dashboard');
+
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [authUser, setAuthUser] = useState<string | null>(null);
+
   const [metrics, setMetrics] = useState<SystemMetrics>({
     total_jobs_discovered: 0,
     high_match_jobs: 0,
@@ -441,9 +448,43 @@ export default function App() {
     }
   };
 
+  const checkAuth = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.auth_enabled || data.authenticated) {
+          setIsAuthenticated(true);
+          setAuthUser(data.username || 'admin');
+        } else {
+          setIsAuthenticated(false);
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
+    } catch {
+      setIsAuthenticated(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      setIsAuthenticated(false);
+      setAuthUser(null);
+    }
+  };
+
   useEffect(() => {
-    refreshAll();
+    checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshAll();
+    }
+  }, [isAuthenticated]);
 
   /**
    * Opens the job named in ?job=<id>, which is the link the browser extension
@@ -514,6 +555,26 @@ export default function App() {
     return msg.length > 85 ? msg.substring(0, 85) + '...' : msg;
   };
 
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
+        <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
+        <span className="text-sm font-medium">Cargando Job Agent...</span>
+      </div>
+    );
+  }
+
+  if (isAuthenticated === false) {
+    return (
+      <LoginScreen
+        onLoginSuccess={(username) => {
+          setIsAuthenticated(true);
+          setAuthUser(username);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-950 text-slate-100 font-sans">
       {/* ======================================================== */}
@@ -552,6 +613,14 @@ export default function App() {
             title="Recargar datos"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="p-2 bg-slate-800 active:bg-slate-700 text-slate-400 hover:text-rose-400 rounded-lg transition"
+            title="Cerrar sesión"
+          >
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
@@ -684,18 +753,27 @@ export default function App() {
           </button>
 
           <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-            <span className="flex items-center space-x-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Online</span>
+            <span className="flex items-center space-x-2 truncate pr-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+              <span className="truncate">{authUser || 'Online'}</span>
             </span>
-            <button
-              onClick={refreshAll}
-              disabled={loading}
-              className="p-1.5 hover:bg-slate-800 rounded-lg transition"
-              title="Actualizar"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
-            </button>
+            <div className="flex items-center space-x-1 shrink-0">
+              <button
+                onClick={refreshAll}
+                disabled={loading}
+                className="p-1.5 hover:bg-slate-800 rounded-lg transition"
+                title="Actualizar"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
+              </button>
+              <button
+                onClick={handleLogout}
+                className="p-1.5 hover:bg-rose-900/30 text-slate-400 hover:text-rose-400 rounded-lg transition"
+                title="Cerrar sesión"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </aside>

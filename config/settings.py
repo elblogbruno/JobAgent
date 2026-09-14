@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     secret_key: str = Field(default="dev-secret-key-change-in-production", alias="SECRET_KEY")
 
+    # Dashboard Authentication
+    auth_enabled: bool = Field(default=False, alias="AUTH_ENABLED")
+    auth_username: str = Field(default="admin", alias="AUTH_USERNAME")
+    auth_password: str = Field(default="", alias="AUTH_PASSWORD")
+    auth_session_expire_days: int = Field(default=30, alias="AUTH_SESSION_EXPIRE_DAYS")
+
+    @property
+    def is_auth_active(self) -> bool:
+        return bool(self.auth_enabled and self.auth_password)
+
     # Reactive Resume
     reactive_resume_base_url: str = Field(
         default="https://rxresu.me/api/openapi",

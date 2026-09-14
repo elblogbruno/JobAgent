@@ -1,12 +1,14 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from apps.api.routes import (
     answers,
     applications,
     assistant,
+    auth,
     candidate,
     extension,
     infojobs,
@@ -18,6 +20,7 @@ from apps.api.routes import (
     system,
     webhooks,
 )
+from apps.api.security import get_current_user_from_request
 from config.settings import settings
 from packages.persistence.database import Base, async_engine
 from packages.persistence import models  # noqa: F401
@@ -51,12 +54,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """Enforces authentication on /api routes when AUTH_ENABLED and AUTH_PASSWORD are set."""
+    path = request.url.path
+    if settings.is_auth_active and path.startswith("/api/"):
+        is_exempt = (
+            path.startswith("/api/auth/")
+            or path.startswith("/api/webhooks/")
+            or path.startswith("/api/extension/")
+            or path == "/api/infojobs/callback"
+            or path == "/api/infojobs/authorize-url"
+            or request.method == "OPTIONS"
+        )
+        if not is_exempt:
+            user = get_current_user_from_request(request)
+            if not user:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Authentication required", "authenticated": False},
+                )
+    return await call_next(request)
+
+
 # Ensure artifact directories exist and mount static evidence/video routes
 Path("artifacts/evidence").mkdir(parents=True, exist_ok=True)
 Path("artifacts/videos").mkdir(parents=True, exist_ok=True)
 app.mount("/evidence", StaticFiles(directory="artifacts/evidence"), name="evidence")
 app.mount("/videos", StaticFiles(directory="artifacts/videos"), name="videos")
 
+app.include_router(auth.router)
 app.include_router(jobs.router)
 app.include_router(applications.router)
 app.include_router(assistant.router)
