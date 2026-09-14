@@ -9,6 +9,8 @@ celery_app = Celery(
         "apps.worker.tasks.discovery",
         "apps.worker.tasks.submission",
         "apps.worker.tasks.monitoring",
+        "apps.worker.tasks.imports",
+        "apps.worker.tasks.role_discovery",
     ],
 )
 
@@ -31,5 +33,14 @@ celery_app.conf.beat_schedule = {
     "monitor-applications-daily": {
         "task": "apps.worker.tasks.monitoring.run_application_monitor",
         "schedule": 14400.0, # every 4 hours
+    },
+    # Learn from what the user imported, then refresh the role map less often.
+    "learn-from-imported-jobs-daily": {
+        "task": "apps.worker.tasks.role_discovery.learn_from_market",
+        "schedule": 86400.0, # every 24 hours
+    },
+    "refresh-role-map-weekly": {
+        "task": "apps.worker.tasks.role_discovery.refresh_role_map",
+        "schedule": 604800.0, # every 7 days
     },
 }

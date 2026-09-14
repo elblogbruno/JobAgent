@@ -1,0 +1,7 @@
+# The image runs npm install itself, and host node_modules carries native
+# binaries built for the host OS. Copying either into the build context makes the
+# build slow and can break it outright.
+node_modules
+dist
+.vite
+npm-debug.log*

@@ -4,8 +4,26 @@
 
 Job Agent is a hybrid deterministic-agentic system designed for continuous, resilient job discovery, evaluation, resume tailoring, automated browser application, and application tracking.
 
+There are two ways a job enters the system. The scheduled discovery engine sweeps
+job boards on its own, and the human-in-the-loop loop described in
+[ROLE_DISCOVERY.md](ROLE_DISCOVERY.md) lets the user import jobs they picked out
+themselves from searches the RoleDiscoveryAgent recommended. Both converge on the
+same normalizer, deduplicator and match engine.
+
 ```mermaid
 flowchart TD
+    subgraph RoleDiscovery ["0. Role Discovery (what to search for)"]
+        CV[Master CV in Reactive Resume] --> CG[CandidateCapabilityGraph]
+        PROFILE[Candidate profile] --> CG
+        CG --> RM[RoleMap: primary / secondary / stretch / avoid]
+        RM --> SQ[(Search queries per provider)]
+        SQ --> EXT[Browser extension: Search Inbox]
+        EXT --> HUMAN[Human browses and clicks Import]
+        HUMAN --> IMPORT[BrowserImportService]
+        IMPORT --> NORM
+        SQ --> JD
+    end
+
     subgraph Discovery ["1. Job Discovery Engine"]
         GH[Greenhouse API] --> JD[JobDiscoveryWorker]
         LEV[Lever API] --> JD
@@ -53,6 +71,13 @@ flowchart TD
         RR_UPDATE --> TG[TelegramNotifier: Send Submission Card]
         VERIFY --> EV[(Audit Evidence & DB State)]
         RR_UPDATE --> MON[ApplicationMonitor: Scheduled Follow-up]
+    end
+
+    subgraph Learning ["6. Market Feedback"]
+        CANON --> FB[Search performance per query]
+        FB --> RM
+        CANON --> NEWROLE[Roles discovered from imported jobs]
+        NEWROLE --> RM
     end
 ```
 

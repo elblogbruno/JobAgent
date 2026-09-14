@@ -2,22 +2,29 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from packages.agents.search_planner import SearchPlannerAgent
 from packages.application_adapters.ashby import AshbyAdapter
 from packages.application_adapters.base import ApplicationAdapter
 from packages.application_adapters.generic import GenericApplicationAdapter
 from packages.application_adapters.greenhouse import GreenhouseAdapter
+from packages.application_adapters.infojobs_api import InfoJobsApiAdapter
 from packages.application_adapters.lever import LeverAdapter
 from packages.browser.locators import BlockedReason, CaptchaBlockedException, SemanticLocators
 from packages.browser.session import BrowserSessionManager
 from packages.candidate_profile.answer_vault import CandidateAnswerVault
-from packages.candidate_profile.profile import CandidateProfileLoader
+from packages.candidate_profile.profile import (
+    CandidateProfileLoader,
+    is_company_allowed,
+    is_role_allowed,
+)
 from packages.domain.enums import ApplicationStatus, ExecutionMode, Recommendation
 from packages.domain.models import (
     CandidateProfileModel,
     CanonicalJob,
-    JobSearchQuery,
     MatchScorecard,
     RawJob,
+    SearchPlan,
+    SearchPlanEntry,
 )
 from packages.job_sources.feeds import ConfiguredFeedsSource
 from packages.match_engine.engine import MatchEngine
@@ -63,6 +70,8 @@ class JobAgentPipeline:
         # Components
         self.answer_vault = CandidateAnswerVault(session)
         self.match_engine = MatchEngine()
+        self.search_planner = SearchPlannerAgent()
+        self.infojobs_adapter = InfoJobsApiAdapter()
         self.resume_agent = ResumeAgent(self.rr_client, self.profile)
         self.cover_letter_agent = CoverLetterAgent(self.profile, rr_client=self.rr_client)
         self.deduplicator = JobDeduplicator(session, self.rr_client)
@@ -76,15 +85,44 @@ class JobAgentPipeline:
         ]
 
     async def run_discovery_cycle(self, limit: int = 20) -> List[CanonicalJob]:
-        """Discovers jobs, normalizes, deduplicates, and evaluates them."""
-        feeds = ConfiguredFeedsSource()
-        query = JobSearchQuery(limit=limit, remote=self.profile.job_preferences.remote)
-        raw_jobs = await feeds.search(query)
+        """Plans the search, discovers jobs, normalizes, deduplicates, and evaluates them."""
+        plan = await self.build_search_plan()
+
+        feeds = ConfiguredFeedsSource(
+            discovery=self.profile.discovery,
+            allowed_sources=self.profile.application_preferences.allowed_sources,
+        )
+        raw_jobs = await feeds.search_plan(
+            plan,
+            limit=limit,
+            per_query_limit=self.profile.discovery.results_per_query,
+        )
+
+        await self.event_repo.log(
+            event_type="DISCOVERY_PLAN",
+            message=(
+                f"Planned {len(plan.entries)} queries ({plan.generated_by}), "
+                f"discovered {len(raw_jobs)} postings"
+            ),
+            details={
+                "generated_by": plan.generated_by,
+                "notes": plan.notes,
+                "queries": [entry.query for entry in plan.entries],
+            },
+        )
 
         processed_jobs: List[CanonicalJob] = []
 
         for raw in raw_jobs:
             canonical = JobNormalizer.normalize(raw)
+
+            # Honour the exclusion lists before spending an evaluation call
+            if not is_role_allowed(self.profile, canonical.role) or not is_company_allowed(
+                self.profile, canonical.company
+            ):
+                canonical.status = ApplicationStatus.IGNORED
+                await self.job_repo.create_or_update(canonical)
+                continue
 
             # Check duplication
             is_dup, reason = await self.deduplicator.is_duplicate(canonical)
@@ -105,6 +143,12 @@ class JobAgentPipeline:
             job_orm = await self.job_repo.create_or_update(canonical)
             canonical.id = job_orm.id
 
+            # Cache the evaluation on the job so the RoleDiscoveryAgent can judge
+            # search performance without walking application runs.
+            job_orm.match_score = scorecard.score
+            job_orm.scorecard = scorecard.model_dump(mode="json")
+            await self.session.flush()
+
             # Record Agent Decision
             await self.decision_repo.record(
                 run_id=job_orm.id,
@@ -123,6 +167,88 @@ class JobAgentPipeline:
                 await self.process_job_application(canonical, scorecard)
 
         return processed_jobs
+
+    async def build_search_plan(self) -> SearchPlan:
+        """Builds the query plan for a discovery cycle.
+
+        The role map is the better source when one exists: its titles were derived
+        from the candidate's capabilities and are already ranked by fit. The
+        SearchPlannerAgent remains the fallback for a system that has not run role
+        discovery yet.
+        """
+        plan = await self.plan_from_role_map()
+        if plan is not None:
+            return plan
+
+        try:
+            ignored = await self.job_repo.list_jobs(status=ApplicationStatus.IGNORED.value, limit=15)
+            promising = await self.job_repo.list_jobs(status=ApplicationStatus.EVALUATED.value, limit=15)
+        except Exception:
+            ignored, promising = [], []
+
+        return await self.search_planner.plan(
+            self.profile,
+            ignored_titles=[job.role for job in ignored],
+            promising_titles=[job.role for job in promising],
+        )
+
+    async def plan_from_role_map(self) -> Optional[SearchPlan]:
+        """Turns the role map into board-friendly keyword queries.
+
+        Board sources match plain keywords, so the stored provider queries (which
+        carry quotes and site: operators for human browsing) are not reused here.
+        The role titles and the alternative titles employers use are.
+        """
+        if not self.profile.role_discovery.enabled:
+            return None
+        try:
+            from packages.role_discovery.service import RoleDiscoveryService
+
+            role_map = await RoleDiscoveryService(
+                self.session, profile=self.profile, rr_client=self.rr_client
+            ).get_role_map()
+        except Exception:
+            return None
+        if role_map is None or not role_map.searchable:
+            return None
+
+        max_queries = max(1, self.profile.discovery.max_queries_per_cycle)
+        locations = list(self.profile.job_preferences.locations)
+        remote = True if self.profile.job_preferences.remote else None
+
+        entries: List[SearchPlanEntry] = []
+        seen: set = set()
+        ordered = role_map.primary + role_map.secondary + role_map.stretch
+
+        for role in ordered:
+            for title in [role.title] + role.equivalent_titles[:1]:
+                key = title.strip().lower()
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                entries.append(
+                    SearchPlanEntry(
+                        query=title.strip(),
+                        locations=locations,
+                        remote=remote,
+                        rationale=(
+                            f"{role.category.value.title()} role from the role map "
+                            f"(fit {role.fit_score}/100)."
+                        ),
+                    )
+                )
+                if len(entries) >= max_queries:
+                    break
+            if len(entries) >= max_queries:
+                break
+
+        if not entries:
+            return None
+        return SearchPlan(
+            entries=entries,
+            generated_by="role-map",
+            notes=f"Derived from role map v{role_map.version} ({role_map.generated_by}).",
+        )
 
     async def process_job_application(
         self,
@@ -155,8 +281,10 @@ class JobAgentPipeline:
                 job=job,
                 match_score=scorecard.score,
                 execution_mode=mode,
+                scorecard=scorecard,
             )
             app_run.reactive_resume_application_id = rr_app.id
+            app_run.reactive_resume_resume_id = self.resume_agent.last_derived_resume_id
             app_run.tailored_resume_path = pdf_path
             app_run.status = ApplicationStatus.READY.value
 
@@ -165,6 +293,7 @@ class JobAgentPipeline:
             app_run.cover_letter_text = cl_text
 
             await self.session.flush()
+            await self.log_tailoring(app_run.id, job.id)
 
         except Exception as exc:
             await self.run_repo.update_status(
@@ -189,11 +318,121 @@ class JobAgentPipeline:
             await self.telegram.notify_review_prompt(job, scorecard, app_run.id)
             return app_run.id
 
-        # 3. Mode is AUTO_APPLY -> Execute browser submission
+        # 3. Mode is AUTO_APPLY -> Submit through the API when available, else the browser
         if mode == ExecutionMode.AUTO_APPLY.value:
-            await self.execute_browser_submission(app_run.id, job, pdf_path, cl_text, scorecard)
+            if self.infojobs_adapter.can_handle(job):
+                await self.execute_infojobs_submission(app_run.id, job, cl_text, scorecard)
+            else:
+                await self.execute_browser_submission(app_run.id, job, pdf_path, cl_text, scorecard)
 
         return app_run.id
+
+    async def log_tailoring(self, run_id: str, job_id: Optional[str]) -> None:
+        """Records what the tailoring changed, and what it refused to claim."""
+        plan = self.resume_agent.last_tailoring
+        if plan is None:
+            return
+
+        changed = []
+        if plan.headline:
+            changed.append("headline")
+        if plan.summary:
+            changed.append("summary")
+        if plan.experience:
+            changed.append(f"{len(plan.experience)} experience entries")
+        if plan.skill_priority:
+            changed.append("skill order")
+
+        message = (
+            f"CV tailored ({plan.generated_by}): {', '.join(changed) or 'nothing changed'}"
+        )
+        if plan.rejected:
+            message += f". Rejected {len(plan.rejected)} unsupported claim(s)"
+        if self.resume_agent.last_patch_error:
+            message += ". The patch failed, so the CV went out as a plain copy of the master"
+
+        await self.event_repo.log(
+            event_type="RESUME_TAILORED",
+            message=message,
+            application_run_id=run_id,
+            job_id=job_id,
+            severity="WARNING" if self.resume_agent.last_patch_error else "INFO",
+            details={
+                "generated_by": plan.generated_by,
+                "headline": plan.headline,
+                "reasoning": plan.reasoning,
+                "rejected": plan.rejected,
+                "patch_error": self.resume_agent.last_patch_error,
+            },
+        )
+
+    async def execute_infojobs_submission(
+        self,
+        run_id: str,
+        job: CanonicalJob,
+        cover_letter_text: str,
+        scorecard: MatchScorecard,
+    ) -> bool:
+        """Submits an InfoJobs application over their REST API, with no browser involved."""
+        await self.run_repo.update_status(run_id, status=ApplicationStatus.APPLYING.value)
+
+        result = await self.infojobs_adapter.apply(
+            job=job,
+            profile=self.profile,
+            cover_letter_text=cover_letter_text,
+        )
+
+        if result.unanswered_questions:
+            for question in result.unanswered_questions:
+                await self.manual_q_repo.create(
+                    question_text=question,
+                    application_run_id=run_id,
+                    context={"source": "infojobs", "offer_id": job.source_job_id},
+                )
+                await self.telegram.notify_manual_question(job, question, run_id)
+
+            await self.run_repo.update_status(
+                run_id,
+                status=ApplicationStatus.NEEDS_USER_INPUT.value,
+                error_message=result.error or "InfoJobs screening questions need a human answer.",
+                error_category="NEEDS_ANSWERS",
+            )
+            return False
+
+        if not result.submitted:
+            await self.run_repo.update_status(
+                run_id,
+                status=ApplicationStatus.FAILED.value,
+                error_message=result.error or "InfoJobs application failed.",
+                error_category="INFOJOBS_ERROR",
+            )
+            return False
+
+        await self.run_repo.update_status(run_id, status=ApplicationStatus.APPLIED.value)
+        await self.event_repo.log(
+            event_type="APPLICATION_SUBMITTED",
+            message=f"InfoJobs application {result.application_code} sent for {job.company}",
+            application_run_id=run_id,
+            job_id=job.id,
+            details={"curriculum": result.curriculum_name, "applied_at": result.applied_at},
+        )
+
+        app_run = await self.run_repo.get_by_id(run_id)
+        if app_run and app_run.reactive_resume_application_id:
+            try:
+                await self.rr_client.update_application(
+                    app_run.reactive_resume_application_id,
+                    ApplicationUpdateRequest(status="applied"),
+                )
+                await self.rr_client.log_application_note(
+                    app_run.reactive_resume_application_id,
+                    f"Submitted through the InfoJobs API. Application code: {result.application_code}",
+                )
+            except Exception:
+                pass
+
+        await self.telegram.notify_submission(job, scorecard, result.curriculum_name or "InfoJobs CV")
+        return True
 
     async def execute_browser_submission(
         self,

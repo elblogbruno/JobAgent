@@ -62,7 +62,12 @@ class GreenhouseAdapter(ApplicationAdapter):
         # Cover letter field if available
         cl_input = await SemanticLocators.find_input_by_label_or_name(page, ["cover letter"])
         if cl_input and cover_letter_text:
-            await cl_input.fill(cover_letter_text)
+            try:
+                tag = await cl_input.evaluate("el => el.tagName ? el.tagName.toLowerCase() : ''")
+                if tag in ("input", "textarea") or await cl_input.is_editable():
+                    await cl_input.fill(cover_letter_text)
+            except Exception:
+                pass
 
         # Iterate custom question fields
         custom_fields = page.locator(".field:has(label)")

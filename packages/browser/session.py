@@ -10,10 +10,12 @@ class BrowserSessionManager:
         user_data_dir: Optional[str] = None,
         headless: Optional[bool] = None,
         timeout_ms: Optional[int] = None,
+        record_video_dir: Optional[str] = None,
     ):
         self.user_data_dir = user_data_dir or settings.browser_user_data_dir
         self.headless = headless if headless is not None else settings.playwright_headless
         self.timeout_ms = timeout_ms or settings.playwright_timeout_ms
+        self.record_video_dir = record_video_dir
         self._playwright = None
         self._context: Optional[BrowserContext] = None
 
@@ -21,18 +23,24 @@ class BrowserSessionManager:
         Path(self.user_data_dir).mkdir(parents=True, exist_ok=True)
         self._playwright = await async_playwright().start()
 
-        self._context = await self._playwright.chromium.launch_persistent_context(
-            user_data_dir=self.user_data_dir,
-            headless=self.headless,
-            viewport={"width": 1440, "height": 900},
-            user_agent=(
+        launch_kwargs = {
+            "user_data_dir": self.user_data_dir,
+            "headless": self.headless,
+            "viewport": {"width": 1440, "height": 900},
+            "user_agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/128.0.0.0 Safari/537.36"
             ),
-            locale="en-US",
-            accept_downloads=True,
-        )
+            "locale": "en-US",
+            "accept_downloads": True,
+        }
+        if self.record_video_dir:
+            Path(self.record_video_dir).mkdir(parents=True, exist_ok=True)
+            launch_kwargs["record_video_dir"] = self.record_video_dir
+            launch_kwargs["record_video_size"] = {"width": 1280, "height": 720}
+
+        self._context = await self._playwright.chromium.launch_persistent_context(**launch_kwargs)
         self._context.set_default_timeout(self.timeout_ms)
         return self._context
 

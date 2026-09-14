@@ -17,7 +17,9 @@ class HallucinationGuard:
     the Master Resume or CandidateProfile.
     """
 
-    def __init__(self, profile: CandidateProfileModel, master_resume_data: Optional[ResumeData] = None):
+    def __init__(
+        self, profile: CandidateProfileModel, master_resume_data: Optional[ResumeData] = None
+    ):
         self.profile = profile
         self.master_resume = master_resume_data
 
@@ -67,9 +69,7 @@ class HallucinationGuard:
                         self.authorized_skills.add(kw.strip().lower())
 
     def verify_tailored_bullets(
-        self,
-        proposed_bullets: List[str],
-        original_bullets: List[str]
+        self, proposed_bullets: List[str], original_bullets: List[str]
     ) -> List[str]:
         """
         Validates that rewritten or highlighted bullets do not invent new facts.
@@ -80,12 +80,56 @@ class HallucinationGuard:
 
         # Check for suspicious claims: invented metrics like "increased revenue by 500%" if not in original
         for bullet in proposed_bullets:
-            numbers = re.findall(r"(\b\d{1,3}%\b|\$\d+[\d,]*|\b\d+\s+years\b)", bullet.lower())
+            # No \b after the percent sign: it is not a word character, so
+            # "cut latency by 40%." never matched and invented metrics walked
+            # straight through.
+            numbers = re.findall(
+                r"(\d{1,3}\s?%"
+                r"|[$€£]\s?\d[\d,.]*"
+                r"|\b\d+\s?x\b"
+                r"|\b\d+\s+(?:years|months|users|people|clients|engineers)\b)",
+                bullet.lower(),
+            )
             for num in numbers:
-                if num not in original_text:
+                if num.strip() not in original_text:
                     violations.append(
                         f"Unverified numeric claim '{num}' in proposed bullet: '{bullet[:80]}...'"
                     )
+
+        return violations
+
+    def verify_no_invented_technologies(
+        self,
+        proposed_text: str,
+        master_corpus: Optional[str] = None,
+    ) -> List[str]:
+        """Catches the failure mode that matters most in a tailored CV.
+
+        A model asked to match a posting will happily fold the posting's stack
+        into the candidate's experience. Every technology term recognised in the
+        proposed text must already appear in the master CV or the profile,
+        otherwise the candidate is being credited with something they never did.
+        """
+        from packages.resume_pipeline.tailoring_agent import technologies_in
+
+        corpus = (master_corpus or "").lower()
+        violations: List[str] = []
+
+        for label in technologies_in(proposed_text):
+            lowered = label.lower()
+            if lowered in self.authorized_skills:
+                continue
+            if corpus and lowered in corpus:
+                continue
+            # The label is our own name for the term; check the words it is made
+            # of too, so "Vulkan / Metal" is not rejected when the CV says Metal.
+            parts = [part.strip() for part in re.split(r"[/&]", label) if part.strip()]
+            if any(
+                part.lower() in self.authorized_skills or (corpus and part.lower() in corpus)
+                for part in parts
+            ):
+                continue
+            violations.append(f"'{label}' appears in the tailored text but not in the master CV")
 
         return violations
 

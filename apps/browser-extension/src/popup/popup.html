@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job Agent</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body class="popup">
+    <header class="bar">
+      <h1>Job Agent</h1>
+      <span class="spacer"></span>
+      <button id="side-panel" class="ghost small" title="Abrir el panel lateral">Panel</button>
+      <button id="refresh" class="ghost small" title="Actualizar búsquedas">Actualizar</button>
+      <button id="options" class="ghost small" title="Ajustes">Ajustes</button>
+    </header>
+    <main>
+      <div id="status"></div>
+      <div id="current"></div>
+      <div id="inbox"></div>
+      <div id="totals"></div>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

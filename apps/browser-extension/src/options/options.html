@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job Agent settings</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>Job Agent settings</h1>
+    </header>
+    <main style="max-width: 560px">
+      <section class="block">
+        <h2 class="section-title">Connection</h2>
+        <label class="field">
+          <span>Job Agent URL</span>
+          <input id="api-url" type="url" placeholder="http://localhost:8000" />
+        </label>
+        <label class="field">
+          <span>Pairing token</span>
+          <input id="token" type="password" placeholder="ja_…" autocomplete="off" />
+        </label>
+        <p class="meta">
+          Create a token in the Job Agent dashboard under Role Discovery, then paste it here. The
+          token is stored only in this browser. Job Agent never asks for your LinkedIn, InfoJobs or
+          Indeed password: those sessions stay in your browser.
+        </p>
+        <div class="actions">
+          <button id="save">Save and test</button>
+          <button id="clear" class="ghost">Clear token</button>
+        </div>
+        <div id="result" style="margin-top: 12px"></div>
+      </section>
+
+      <section class="block">
+        <h2 class="section-title">Behaviour</h2>
+        <label class="field">
+          <span>Page button</span>
+          <label style="text-transform: none; letter-spacing: 0; color: var(--text)">
+            <input id="inject" type="checkbox" />
+            Show an Import to Job Agent button on job pages
+          </label>
+        </label>
+        <p class="meta" id="prepare-note">
+          Whether importing also tailors your CV is a backend setting, read on every
+          import. Change it in the dashboard, on the Role Discovery page.
+        </p>
+        <p class="meta">
+          Keyboard shortcuts are configured at chrome://extensions/shortcuts. The defaults are
+          Ctrl+Shift+J to import and Ctrl+Shift+K to import and prepare the application.
+        </p>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

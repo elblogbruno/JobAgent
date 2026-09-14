@@ -18,7 +18,9 @@ from packages.reactive_resume.models import (
 
 
 class ReactiveResumeError(Exception):
-    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None):
+    def __init__(
+        self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.response_body = response_body
@@ -32,17 +34,20 @@ class ReactiveResumeNotFoundError(ReactiveResumeError):
     pass
 
 
+from config.settings import settings
+
+
 class ReactiveResumeClient:
     def __init__(
         self,
-        base_url: str = "https://rxresu.me/api/openapi",
-        api_key: str = "",
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
         timeout: float = 60.0,
     ):
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
+        self.base_url = (base_url or settings.reactive_resume_base_url).rstrip("/")
+        self.api_key = api_key if api_key is not None else settings.reactive_resume_api_key
         self.headers = {
-            "x-api-key": api_key,
+            "x-api-key": self.api_key,
             "Accept": "application/json",
         }
         self.timeout = timeout
@@ -98,9 +103,7 @@ class ReactiveResumeClient:
     # ================= RESUMES =================
 
     async def list_resumes(
-        self,
-        tags: Optional[List[str]] = None,
-        sort: Optional[str] = None
+        self, tags: Optional[List[str]] = None, sort: Optional[str] = None
     ) -> List[ResumeListItem]:
         params = {}
         if tags:
@@ -117,11 +120,7 @@ class ReactiveResumeClient:
         return ResumeDetail.model_validate(resp.json())
 
     async def create_resume(
-        self,
-        name: str,
-        slug: str,
-        tags: Optional[List[str]] = None,
-        with_sample_data: bool = False
+        self, name: str, slug: str, tags: Optional[List[str]] = None, with_sample_data: bool = False
     ) -> str:
         body = {
             "name": name,
@@ -134,11 +133,7 @@ class ReactiveResumeClient:
         return data.get("id") if isinstance(data, dict) else str(data)
 
     async def duplicate_resume(
-        self,
-        resume_id: str,
-        name: str,
-        slug: str,
-        tags: Optional[List[str]] = None
+        self, resume_id: str, name: str, slug: str, tags: Optional[List[str]] = None
     ) -> ResumeDetail:
         body = {
             "name": name,
@@ -157,7 +152,7 @@ class ReactiveResumeClient:
         self,
         resume_id: str,
         operations: List[JsonPatchOperation],
-        expected_updated_at: Optional[datetime] = None
+        expected_updated_at: Optional[datetime] = None,
     ) -> ResumeDetail:
         body: Dict[str, Any] = {
             "operations": [op.model_dump(by_alias=True, exclude_none=True) for op in operations]
@@ -173,17 +168,20 @@ class ReactiveResumeClient:
         return resp.is_success
 
     async def download_resume_pdf(
-        self,
-        resume_id: str,
-        target: Literal["resume", "cover-letter"] = "resume"
+        self, resume_id: str, target: Literal["resume", "cover-letter"] = "resume"
     ) -> bytes:
         resp = await self._request(
             "GET",
             f"/resumes/{resume_id}/pdf",
             params={"target": target},
-            headers={"Accept": "application/pdf"}
+            headers={"Accept": "application/pdf"},
         )
         return resp.content
+
+    async def delete_resume(self, resume_id: str) -> bool:
+        """Deletes a resume. Reactive Resume has no undo, so callers must confirm."""
+        resp = await self._request("DELETE", f"/resumes/{resume_id}")
+        return resp.status_code < 300
 
     async def list_resume_tags(self) -> List[str]:
         resp = await self._request("GET", "/resumes/tags")
@@ -201,10 +199,7 @@ class ReactiveResumeClient:
     # ================= APPLICATIONS =================
 
     async def list_applications(
-        self,
-        stage: Optional[str] = None,
-        tag: Optional[str] = None,
-        include_archived: bool = False
+        self, stage: Optional[str] = None, tag: Optional[str] = None, include_archived: bool = False
     ) -> List[ApplicationResponse]:
         params = {}
         if stage:
@@ -236,9 +231,7 @@ class ReactiveResumeClient:
         return ApplicationResponse.model_validate(resp.json())
 
     async def update_application(
-        self,
-        application_id: str,
-        data: ApplicationUpdateRequest
+        self, application_id: str, data: ApplicationUpdateRequest
     ) -> ApplicationResponse:
         body = data.model_dump(exclude_none=True)
         if data.followUpAt:
@@ -255,31 +248,23 @@ class ReactiveResumeClient:
         application_id: str,
         kind: Literal["resume", "cover-letter"],
         file_bytes: bytes,
-        filename: str = "document.pdf"
+        filename: str = "document.pdf",
     ) -> Dict[str, Any]:
-        files = {
-            "file": (filename, file_bytes, "application/pdf")
-        }
+        files = {"file": (filename, file_bytes, "application/pdf")}
         resp = await self._request(
-            "POST",
-            f"/applications/{application_id}/documents/{kind}",
-            files=files
+            "POST", f"/applications/{application_id}/documents/{kind}", files=files
         )
         return resp.json()
 
     async def remove_application_document(
-        self,
-        application_id: str,
-        kind: Literal["resume", "cover-letter"]
+        self, application_id: str, kind: Literal["resume", "cover-letter"]
     ) -> bool:
         resp = await self._request("DELETE", f"/applications/{application_id}/documents/{kind}")
         return resp.is_success
 
     async def log_application_note(self, application_id: str, note: str) -> Dict[str, Any]:
         resp = await self._request(
-            "POST",
-            f"/applications/{application_id}/notes",
-            json_data={"text": note}
+            "POST", f"/applications/{application_id}/notes", json_data={"text": note}
         )
         return resp.json()
 
@@ -296,9 +281,7 @@ class ReactiveResumeClient:
 
     async def autofill_from_job(self, job_description: str) -> ApplicationAutofillResponse:
         resp = await self._request(
-            "POST",
-            "/applications/ai/autofill",
-            json_data={"jobDescription": job_description}
+            "POST", "/applications/ai/autofill", json_data={"jobDescription": job_description}
         )
         return ApplicationAutofillResponse.model_validate(resp.json())
 
@@ -311,14 +294,10 @@ class ReactiveResumeClient:
         return ApplicationTailorResponse.model_validate(resp.json())
 
     async def draft_message_ai(
-        self,
-        application_id: str,
-        kind: Literal["cover-letter", "follow-up"] = "cover-letter"
+        self, application_id: str, kind: Literal["cover-letter", "follow-up"] = "cover-letter"
     ) -> ApplicationDraftMessageResponse:
         resp = await self._request(
-            "POST",
-            f"/applications/{application_id}/ai/draft-message",
-            json_data={"kind": kind}
+            "POST", f"/applications/{application_id}/ai/draft-message", json_data={"kind": kind}
         )
         return ApplicationDraftMessageResponse.model_validate(resp.json())
 
@@ -326,8 +305,6 @@ class ReactiveResumeClient:
 
     async def create_cover_letter(self, data: CoverLetterCreateRequest) -> CoverLetterResponse:
         resp = await self._request(
-            "POST",
-            "/coverLetters/create",
-            json_data=data.model_dump(exclude_none=True)
+            "POST", "/coverLetters/create", json_data=data.model_dump(exclude_none=True)
         )
         return CoverLetterResponse.model_validate(resp.json())

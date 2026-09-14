@@ -22,10 +22,8 @@ class Settings(BaseSettings):
         alias="REACTIVE_RESUME_BASE_URL"
     )
     reactive_resume_api_key: str = Field(default="", alias="REACTIVE_RESUME_API_KEY")
-    reactive_resume_master_resume_id: str = Field(
-        default="",
-        alias="REACTIVE_RESUME_MASTER_RESUME_ID"
-    )
+    # The master CV lives in config/candidate-profile.yaml, under reactive_resume.
+    # It is chosen from the dashboard, so it is deliberately not an env var.
 
     # Telegram
     telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
@@ -41,6 +39,14 @@ class Settings(BaseSettings):
     gemini_model: str = Field(default="gemini-1.5-pro", alias="GEMINI_MODEL")
     openrouter_api_key: Optional[str] = Field(default=None, alias="OPENROUTER_API_KEY")
     ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
+
+    # InfoJobs API (https://developer.infojobs.net)
+    infojobs_client_id: str = Field(default="", alias="INFOJOBS_CLIENT_ID")
+    infojobs_client_secret: str = Field(default="", alias="INFOJOBS_CLIENT_SECRET")
+    infojobs_access_token: str = Field(default="", alias="INFOJOBS_ACCESS_TOKEN")
+    infojobs_refresh_token: str = Field(default="", alias="INFOJOBS_REFRESH_TOKEN")
+    infojobs_redirect_uri: str = Field(default="", alias="INFOJOBS_REDIRECT_URI")
+    infojobs_curriculum_code: str = Field(default="", alias="INFOJOBS_CURRICULUM_CODE")
 
     # Database & Message Queue
     database_url: str = Field(
@@ -68,6 +74,10 @@ class Settings(BaseSettings):
         default="http://localhost:3000,http://localhost:5173",
         alias="CORS_ORIGINS"
     )
+
+    # Browser extension
+    extension_auth_required: bool = Field(default=True, alias="EXTENSION_AUTH_REQUIRED")
+    dashboard_url: str = Field(default="http://localhost:3000", alias="DASHBOARD_URL")
 
     # Candidate Profile Path
     candidate_profile_path: Path = Field(

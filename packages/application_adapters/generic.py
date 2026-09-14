@@ -77,7 +77,12 @@ class GenericApplicationAdapter(ApplicationAdapter):
         # 7. Cover Letter
         cl_el = await SemanticLocators.find_input_by_label_or_name(page, ["cover letter", "carta", "motivation", "summary"])
         if cl_el and cover_letter_text:
-            await cl_el.fill(cover_letter_text)
+            try:
+                tag = await cl_el.evaluate("el => el.tagName ? el.tagName.toLowerCase() : ''")
+                if tag in ("input", "textarea") or await cl_el.is_editable():
+                    await cl_el.fill(cover_letter_text)
+            except Exception:
+                pass
 
         # 8. Unanswered inputs through Answer Vault
         all_text_inputs = page.locator("input[type='text'], textarea")

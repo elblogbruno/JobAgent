@@ -67,3 +67,6 @@ data/temp/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Celery
+celerybeat-schedule*

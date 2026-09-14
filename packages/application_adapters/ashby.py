@@ -61,7 +61,12 @@ class AshbyAdapter(ApplicationAdapter):
         # Cover letter
         cl_input = await SemanticLocators.find_input_by_label_or_name(page, ["cover letter"])
         if cl_input and cover_letter_text:
-            await cl_input.fill(cover_letter_text)
+            try:
+                tag = await cl_input.evaluate("el => el.tagName ? el.tagName.toLowerCase() : ''")
+                if tag in ("input", "textarea") or await cl_input.is_editable():
+                    await cl_input.fill(cover_letter_text)
+            except Exception:
+                pass
 
     async def validate(self, page: Page) -> List[str]:
         return await FormNavigator.get_visible_validation_errors(page)

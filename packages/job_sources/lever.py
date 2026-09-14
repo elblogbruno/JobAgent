@@ -10,7 +10,7 @@ class LeverSource(JobSource):
     BASE_URL = "https://api.lever.co/v0/postings"
 
     def __init__(self, sites: Optional[List[str]] = None, timeout: float = 30.0):
-        self.sites = sites or ["palantir", "netflix", "spotify", "datadog", "figma"]
+        self.sites = sites or ["palantir", "spotify"]
         self.timeout = timeout
 
     async def search(self, query: JobSearchQuery) -> List[RawJob]:

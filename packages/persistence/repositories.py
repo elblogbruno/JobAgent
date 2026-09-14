@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from sqlalchemy import desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from packages.domain.models import CanonicalJob
+from packages.domain.role_discovery import JobProvenance
 from packages.persistence.models import (
     AgentDecisionORM,
     AgentRunORM,
@@ -14,6 +15,14 @@ from packages.persistence.models import (
     ManualQuestionORM,
     NotificationORM,
 )
+
+
+def _to_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 class JobRepository:
@@ -28,11 +37,53 @@ class JobRepository:
         result = await self.session.execute(select(JobORM).where(JobORM.dedup_hash == dedup_hash))
         return result.scalar_one_or_none()
 
-    async def create_or_update(self, job: CanonicalJob) -> JobORM:
+    async def get_by_canonical_url(self, url: str) -> Optional[JobORM]:
+        result = await self.session.execute(
+            select(JobORM).where(JobORM.canonical_url == url)
+        )
+        return result.scalars().first()
+
+    async def get_by_source_url(self, url: str) -> Optional[JobORM]:
+        result = await self.session.execute(select(JobORM).where(JobORM.source_url == url))
+        return result.scalars().first()
+
+    async def get_by_source_job_id(self, source: str, source_job_id: str) -> Optional[JobORM]:
+        result = await self.session.execute(
+            select(JobORM).where(
+                JobORM.source == source, JobORM.source_job_id == source_job_id
+            )
+        )
+        return result.scalars().first()
+
+    async def get_by_fingerprint(self, fingerprint: str) -> Optional[JobORM]:
+        result = await self.session.execute(
+            select(JobORM).where(JobORM.description_fingerprint == fingerprint)
+        )
+        return result.scalars().first()
+
+    async def find_by_company_and_role(
+        self, normalized_company: str, normalized_role: str
+    ) -> Optional[JobORM]:
+        result = await self.session.execute(
+            select(JobORM).where(
+                JobORM.normalized_company == normalized_company,
+                JobORM.normalized_role == normalized_role,
+            )
+        )
+        return result.scalars().first()
+
+    async def create_or_update(
+        self,
+        job: CanonicalJob,
+        provenance: Optional[JobProvenance] = None,
+        description_fingerprint: Optional[str] = None,
+    ) -> JobORM:
         existing = await self.get_by_hash(job.dedup_hash)
         if existing:
             existing.status = job.status.value
             existing.updated_at = datetime.utcnow()
+            if description_fingerprint and not existing.description_fingerprint:
+                existing.description_fingerprint = description_fingerprint
             await self.session.flush()
             return existing
 
@@ -58,9 +109,15 @@ class JobRepository:
             preferred_requirements=job.preferred_requirements,
             technologies=job.technologies,
             status=job.status.value,
-            published_at=job.published_at,
-            discovered_at=job.discovered_at,
+            published_at=_to_naive_utc(job.published_at),
+            discovered_at=_to_naive_utc(job.discovered_at) or datetime.utcnow(),
+            description_fingerprint=description_fingerprint,
         )
+        if provenance is not None:
+            orm_obj.discovered_by = provenance.discovered_by.value
+            orm_obj.search_query_id = provenance.search_query_id
+            orm_obj.search_provider = provenance.search_provider
+            orm_obj.source_url = provenance.source_url
         self.session.add(orm_obj)
         await self.session.flush()
         return orm_obj
@@ -69,11 +126,17 @@ class JobRepository:
         self,
         status: Optional[str] = None,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
+        discovered_by: Optional[str] = None,
+        search_query_id: Optional[str] = None,
     ) -> List[JobORM]:
         stmt = select(JobORM).order_by(desc(JobORM.discovered_at))
         if status:
             stmt = stmt.where(JobORM.status == status)
+        if discovered_by:
+            stmt = stmt.where(JobORM.discovered_by == discovered_by)
+        if search_query_id:
+            stmt = stmt.where(JobORM.search_query_id == search_query_id)
         stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
@@ -121,6 +184,7 @@ class ApplicationRunRepository:
         status: str,
         error_message: Optional[str] = None,
         error_category: Optional[str] = None,
+        submission_evidence: Optional[Dict[str, Any]] = None,
     ) -> Optional[ApplicationRunORM]:
         run = await self.get_by_id(run_id)
         if not run:
@@ -130,6 +194,8 @@ class ApplicationRunRepository:
             run.error_message = error_message
         if error_category is not None:
             run.error_category = error_category
+        if submission_evidence is not None:
+            run.submission_evidence = submission_evidence
         run.updated_at = datetime.utcnow()
         await self.session.flush()
         return run

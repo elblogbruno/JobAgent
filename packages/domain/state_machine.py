@@ -87,6 +87,42 @@ ALLOWED_TRANSITIONS: Dict[ApplicationStatus, Set[ApplicationStatus]] = {
 }
 
 
+# A person reporting what they did by hand carries more authority than the
+# pipeline's own progression. Someone who applied on the company site can say so
+# from any pre-submission state, which ALLOWED_TRANSITIONS deliberately forbids
+# for the automated path.
+MANUALLY_REPORTABLE: Dict[ApplicationStatus, Set[ApplicationStatus]] = {
+    ApplicationStatus.APPLIED: {
+        ApplicationStatus.DISCOVERED,
+        ApplicationStatus.NORMALIZED,
+        ApplicationStatus.EVALUATED,
+        ApplicationStatus.IGNORED,
+        ApplicationStatus.PREPARING,
+        ApplicationStatus.NEEDS_USER_INPUT,
+        ApplicationStatus.READY,
+        ApplicationStatus.READY_FOR_REVIEW,
+        ApplicationStatus.APPLYING,
+        ApplicationStatus.SUBMITTED_UNVERIFIED,
+        ApplicationStatus.BLOCKED,
+        ApplicationStatus.FAILED,
+    },
+    ApplicationStatus.INTERVIEW: {ApplicationStatus.APPLIED, ApplicationStatus.SUBMITTED_UNVERIFIED},
+    ApplicationStatus.OFFER: {ApplicationStatus.APPLIED, ApplicationStatus.INTERVIEW},
+    ApplicationStatus.REJECTED: {
+        ApplicationStatus.APPLIED,
+        ApplicationStatus.SUBMITTED_UNVERIFIED,
+        ApplicationStatus.INTERVIEW,
+    },
+    ApplicationStatus.WITHDRAWN: {
+        ApplicationStatus.APPLIED,
+        ApplicationStatus.SUBMITTED_UNVERIFIED,
+        ApplicationStatus.INTERVIEW,
+        ApplicationStatus.READY,
+        ApplicationStatus.READY_FOR_REVIEW,
+    },
+}
+
+
 def can_transition(current: ApplicationStatus, target: ApplicationStatus) -> bool:
     if current == target:
         return True
@@ -95,4 +131,18 @@ def can_transition(current: ApplicationStatus, target: ApplicationStatus) -> boo
 
 def validate_transition(current: ApplicationStatus, target: ApplicationStatus, context: str = ""):
     if not can_transition(current, target):
+        raise InvalidStateTransitionError(current, target, context)
+
+
+def can_record_outcome(current: ApplicationStatus, target: ApplicationStatus) -> bool:
+    """Whether a human may report `target` on a run currently in `current`."""
+    if current == target:
+        return True
+    if can_transition(current, target):
+        return True
+    return current in MANUALLY_REPORTABLE.get(target, set())
+
+
+def validate_outcome(current: ApplicationStatus, target: ApplicationStatus, context: str = ""):
+    if not can_record_outcome(current, target):
         raise InvalidStateTransitionError(current, target, context)

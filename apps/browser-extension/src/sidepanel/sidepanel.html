@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job Agent</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>Job Agent</h1>
+      <span class="spacer"></span>
+      <button id="refresh" class="ghost small" title="Actualizar">Actualizar</button>
+      <button id="options" class="ghost small" title="Ajustes">Ajustes</button>
+    </header>
+
+    <div id="status" class="status-line"></div>
+
+    <nav class="tabs">
+      <button id="tab-job" class="tab active">Esta oferta</button>
+      <button id="tab-searches" class="tab">Búsquedas</button>
+    </nav>
+
+    <main>
+      <!-- ESTA OFERTA -->
+      <div id="panel-job">
+        <section class="block">
+          <h2 class="section-title">1 · La oferta</h2>
+          <div id="current"></div>
+        </section>
+
+        <section class="block" id="form-block" hidden>
+          <h2 class="section-title">2 · Preguntas del formulario</h2>
+          <p class="meta" id="form-hint"></p>
+          <div id="form-questions"></div>
+        </section>
+
+        <section class="block">
+          <h2 class="section-title">3 · Pregúntame lo que quieras</h2>
+          <p class="meta">
+            Redacto con tu CV y esta oferta. Si tienes la pregunta en pantalla, selecciónala y
+            usa el botón derecho para enviármela.
+          </p>
+          <div class="chat-log" id="chat-log"></div>
+          <div class="chat-input">
+            <textarea id="chat-question" placeholder="¿Por qué quieres trabajar aquí?"></textarea>
+          </div>
+          <div class="actions">
+            <button id="chat-send">Preguntar</button>
+            <button id="chat-clear" class="ghost">Limpiar</button>
+          </div>
+        </section>
+
+        <section class="block" id="sent-block">
+          <h2 class="section-title">4 · Cuando la hayas enviado</h2>
+          <p class="meta">
+            Marca la candidatura como enviada sin salir de aquí. No envía nada: solo registra lo
+            que ya hiciste, y es lo que hace que el agente aprenda qué búsquedas funcionan.
+          </p>
+          <div id="sent-controls"></div>
+        </section>
+      </div>
+
+      <!-- BÚSQUEDAS -->
+      <div id="panel-searches" hidden>
+        <div id="inbox"></div>
+        <details id="totals-wrap">
+          <summary class="meta">Rendimiento de tus búsquedas</summary>
+          <div id="totals"></div>
+        </details>
+      </div>
+    </main>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

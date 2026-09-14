@@ -21,6 +21,28 @@ class JobSearchQuery(BaseModel):
     offset: int = 0
 
 
+class SearchPlanEntry(BaseModel):
+    query: str
+    locations: List[str] = Field(default_factory=list)
+    remote: Optional[bool] = None
+    rationale: str = ""
+
+    def to_search_query(self, limit: int = 50) -> JobSearchQuery:
+        return JobSearchQuery(
+            query=self.query,
+            locations=self.locations,
+            remote=self.remote,
+            limit=limit,
+        )
+
+
+class SearchPlan(BaseModel):
+    entries: List[SearchPlanEntry] = Field(default_factory=list)
+    generated_by: str = "fallback"  # llm | fallback
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    notes: str = ""
+
+
 class RawJob(BaseModel):
     source: JobSourceType
     source_job_id: str
@@ -137,10 +159,63 @@ class ReactiveResumeConfig(BaseModel):
     master_resume_name: str = "Bruno Moya — Master CV"
 
 
+class DiscoveryConfig(BaseModel):
+    """Configures which boards the agent polls and how search queries are planned."""
+
+    greenhouse_boards: List[str] = Field(default_factory=list)
+    lever_sites: List[str] = Field(default_factory=list)
+    ashby_boards: List[str] = Field(default_factory=list)
+    company_career_urls: List[str] = Field(default_factory=list)
+    infojobs_provinces: List[str] = Field(default_factory=list)
+    infojobs_detail_limit: int = 25
+    seed_queries: List[str] = Field(default_factory=list)
+    use_llm_planner: bool = True
+    max_queries_per_cycle: int = 8
+    results_per_query: int = 25
+
+
+class RoleDiscoveryConfig(BaseModel):
+    """Governs the RoleDiscoveryAgent, its search budget and its learning policy."""
+
+    enabled: bool = True
+    use_llm: bool = True
+    refresh_interval_hours: int = 168
+    max_roles: int = 18
+    total_active_queries: int = 18
+
+    # Exploration budget: exploit what works, but keep testing unfamiliar roles.
+    primary_share: float = 0.7
+    secondary_share: float = 0.2
+    exploratory_share: float = 0.1
+
+    providers: List[str] = Field(
+        default_factory=lambda: ["linkedin", "google", "infojobs", "indeed", "generic-web"]
+    )
+
+    # Learning policy.
+    high_match_threshold: int = 80
+    min_samples_before_demoting: int = 5
+    demote_below_average_score: int = 60
+    disable_below_average_score: int = 45
+    auto_accept_proposed_roles: bool = False
+    auto_accept_fit_threshold: int = 85
+
+
+class ExtensionConfig(BaseModel):
+    """Settings the browser extension reads after pairing."""
+
+    dashboard_url: str = "http://localhost:3000"
+    import_prepares_application: bool = False
+    high_match_threshold: int = 80
+
+
 class CandidateProfileModel(BaseModel):
     identity: CandidateIdentity
     job_preferences: CandidateJobPreferences
     application_preferences: ApplicationPreferences
+    discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
+    role_discovery: RoleDiscoveryConfig = Field(default_factory=RoleDiscoveryConfig)
+    extension: ExtensionConfig = Field(default_factory=ExtensionConfig)
     reactive_resume: ReactiveResumeConfig = Field(default_factory=ReactiveResumeConfig)
 
 

@@ -1,3 +1,4 @@
+from datetime import timezone
 import hashlib
 import re
 from typing import List, Optional, Tuple
@@ -117,6 +118,20 @@ class JobNormalizer:
         return found
 
     @classmethod
+    def description_fingerprint(cls, description: str) -> Optional[str]:
+        """A content hash used to spot the same posting republished elsewhere.
+
+        Only alphanumeric words are kept, so formatting, boilerplate whitespace and
+        the board's own decoration do not change the fingerprint.
+        """
+        if not description:
+            return None
+        words = re.findall(r"[a-z0-9]+", description.lower())
+        if len(words) < 25:
+            return None
+        return hashlib.sha256(" ".join(words[:400]).encode("utf-8")).hexdigest()
+
+    @classmethod
     def compute_hash(cls, normalized_company: str, normalized_role: str, source_job_id: str) -> str:
         key = f"{normalized_company.lower()}:{normalized_role.lower()}:{source_job_id.lower()}"
         return hashlib.sha256(key.encode("utf-8")).hexdigest()
@@ -152,6 +167,14 @@ class JobNormalizer:
             preferred_requirements=raw.preferred_requirements,
             technologies=technologies,
             status=ApplicationStatus.NORMALIZED,
-            published_at=raw.published_at,
-            discovered_at=raw.discovered_at,
+            published_at=(
+                raw.published_at.astimezone(timezone.utc).replace(tzinfo=None)
+                if raw.published_at and raw.published_at.tzinfo
+                else raw.published_at
+            ),
+            discovered_at=(
+                raw.discovered_at.astimezone(timezone.utc).replace(tzinfo=None)
+                if raw.discovered_at and raw.discovered_at.tzinfo
+                else raw.discovered_at
+            ),
         )

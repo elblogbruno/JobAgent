@@ -1,82 +1,139 @@
-# CandidateProfile Master Configuration
-# Source of truth for candidate data and application preferences
-
 identity:
-  name: "Bruno Moya"
-  email: "bruno.moya@glassear.com"
-  phone: "+34 633 860 821"
-  location: "Santpedor, Barcelona, Spain"
-  linkedin: "https://linkedin.com/in/brunomoya"
-  github: "https://github.com/brunomoya"
-  website: "https://glassear.com"
-
+  name: Bruno Moya
+  email: bruno.moya@glassear.com
+  phone: +34 633 860 821
+  location: Santpedor, Barcelona, Spain
+  linkedin: https://linkedin.com/in/brunomoya
+  github: https://github.com/brunomoya
+  website: https://glassear.com
 job_preferences:
   locations:
-    - "Spain"
-    - "Barcelona"
-    - "Europe"
-    - "European Union"
-    - "Remote (EU)"
-    - "Remote (Worldwide)"
-    - "United States (Remote/Visa)"
+  - Spain
+  - Barcelona
+  - Europe
+  - European Union
+  - Remote (EU)
+  - Remote (Worldwide)
+  - United States (Remote/Visa)
   remote: true
   hybrid: true
   onsite: false
-
   roles:
-    - "Software Engineer"
-    - "XR Engineer"
-    - "AR/VR Engineer"
-    - "Unity Developer"
-    - "Technical Lead"
-    - "CTO"
-    - "Founding Engineer"
-    - "Computer Vision Engineer"
-    - "Spatial Computing Architect"
-
+  - Software Engineer
+  - XR Engineer
+  - AR/VR Engineer
+  - Unity Developer
+  - Technical Lead
+  - CTO
+  - Founding Engineer
+  - Computer Vision Engineer
+  - Spatial Computing Architect
   interests:
-    - "XR"
-    - "AR"
-    - "VR"
-    - "spatial computing"
-    - "computer vision"
-    - "AI"
-    - "developer tools"
-    - "startups"
-    - "real-time graphics"
-
-  minimum_salary: 85000
-  preferred_salary: 110000
+  - XR
+  - AR
+  - VR
+  - spatial computing
+  - computer vision
+  - AI
+  - developer tools
+  - startups
+  - real-time graphics
+  minimum_salary: 20000.0
+  preferred_salary: 30000.0
   currencies:
-    - "EUR"
-    - "USD"
-    - "GBP"
+  - EUR
+  - USD
+  - GBP
   relocation: false
   visa_requirements:
     authorized_eu: true
     authorized_us: false
     requires_sponsorship_us: true
     requires_sponsorship_eu: false
-
 application_preferences:
-  execution_mode: "AUTO_APPLY" # DISCOVERY_ONLY | PREPARE | REVIEW_BEFORE_SUBMIT | AUTO_APPLY
+  execution_mode: AUTO_APPLY
   auto_apply_threshold: 82
   prepare_threshold: 65
   maximum_daily_applications: 10
   allowed_sources:
-    - "greenhouse"
-    - "lever"
-    - "ashby"
-    - "company-careers"
-    - "generic-web"
+  - greenhouse
+  - lever
+  - ashby
+  - infojobs
+  - company-careers
+  - generic-web
   excluded_companies: []
   excluded_roles:
-    - "Intern"
-    - "Junior"
+  - Intern
+  - Junior
   require_salary_match: false
   require_remote_match: true
   follow_up_days: 7
-
+discovery:
+  greenhouse_boards:
+  - roblox
+  - epicgames
+  - discord
+  - figma
+  - wayve
+  - scaleai
+  - anthropic
+  - cloudflare
+  lever_sites:
+  - sandboxvr
+  - palantir
+  - spotify
+  ashby_boards:
+  - worldlabs
+  - odyssey
+  - skydio
+  - runway
+  - sesame
+  - physicalintelligence
+  - perplexity
+  - replit
+  - elevenlabs
+  - linear
+  company_career_urls: []
+  infojobs_provinces: []
+  infojobs_detail_limit: 25
+  seed_queries:
+  - XR Engineer
+  - Unity Developer
+  - Computer Vision
+  - Spatial Computing
+  - Augmented Reality
+  - Real-Time Graphics
+  - Founding Engineer
+  - Technical Lead
+  use_llm_planner: true
+  max_queries_per_cycle: 8
+  results_per_query: 25
+role_discovery:
+  enabled: true
+  use_llm: true
+  refresh_interval_hours: 168
+  max_roles: 18
+  total_active_queries: 18
+  primary_share: 0.7
+  secondary_share: 0.2
+  exploratory_share: 0.1
+  providers:
+  - linkedin
+  - google
+  - infojobs
+  - indeed
+  - generic-web
+  high_match_threshold: 80
+  min_samples_before_demoting: 5
+  demote_below_average_score: 60
+  disable_below_average_score: 45
+  auto_accept_proposed_roles: false
+  auto_accept_fit_threshold: 85
+extension:
+  dashboard_url: http://localhost:3000
+  import_prepares_application: false
+  high_match_threshold: 80
 reactive_resume:
-  master_resume_id: "019befd7-8cda-711c-88ca-1e18f9d65ed1"
-  master_resume_name: "English CV"
+  master_resume_id: 01a087e4-7a37-73c3-9e5a-a3a1456c4249
+  master_resume_name: CV 1 Español Technical Founder • Product Engineer - AI Draft

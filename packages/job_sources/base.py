@@ -4,6 +4,10 @@ from packages.domain.models import JobSearchQuery, RawJob
 
 
 class JobSource(ABC):
+    # Board-style sources publish a full listing that can be fetched once and filtered
+    # locally. Keyword-style sources (a search API) must receive every query instead.
+    requires_query_parameter: bool = False
+
     @abstractmethod
     async def search(self, query: JobSearchQuery) -> List[RawJob]:
         """Discovers jobs matching query parameters."""

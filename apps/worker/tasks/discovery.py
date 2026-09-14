@@ -13,10 +13,4 @@ def discover_and_evaluate_jobs(limit: int = 20):
             await session.commit()
             return len(jobs)
 
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        import nest_asyncio
-        nest_asyncio.apply()
-        return loop.run_until_complete(_run())
-    else:
-        return asyncio.run(_run())
+    return asyncio.run(_run())

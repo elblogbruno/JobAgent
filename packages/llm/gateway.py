@@ -16,9 +16,21 @@ class LLMGateway:
             cls._instance = LLMGateway()
         return cls._instance
 
+    @classmethod
+    def reset(cls):
+        cls._instance = None
+
     def _init_default_provider(self) -> LLMProvider:
         # Priority order based on configured keys
-        if settings.default_llm_provider == "openai" and settings.openai_api_key:
+        if settings.default_llm_provider == "ollama":
+            try:
+                from packages.llm.ollama_provider import OllamaProvider
+                return OllamaProvider(base_url=settings.ollama_base_url, model="llama3")
+            except Exception:
+                pass
+        elif settings.default_llm_provider == "mock":
+            return MockLLMProvider()
+        elif settings.default_llm_provider == "openai" and settings.openai_api_key:
             try:
                 from packages.llm.openai_provider import OpenAIProvider
                 return OpenAIProvider(

@@ -21,17 +21,13 @@ class CoverLetterAgent:
         self,
         profile: CandidateProfileModel,
         llm_gateway: Optional[LLMGateway] = None,
-        rr_client: Optional[ReactiveResumeClient] = None
+        rr_client: Optional[ReactiveResumeClient] = None,
     ):
         self.profile = profile
         self.gateway = llm_gateway or LLMGateway.get()
         self.rr_client = rr_client
 
-    async def generate(
-        self,
-        job: CanonicalJob,
-        application_id: Optional[str] = None
-    ) -> str:
+    async def generate(self, job: CanonicalJob, application_id: Optional[str] = None) -> str:
         prompt = f"""
 Candidate:
 - Name: {self.profile.identity.name}

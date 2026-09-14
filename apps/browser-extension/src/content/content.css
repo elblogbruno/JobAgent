@@ -1,0 +1,15 @@
+/* The only style applied to the host page. Everything else lives inside the
+   shadow root, so the page's own CSS and ours cannot affect each other. */
+#job-agent-host {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483000;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}

@@ -11,14 +11,10 @@ class GreenhouseSource(JobSource):
 
     def __init__(self, board_tokens: Optional[List[str]] = None, timeout: float = 30.0):
         self.board_tokens = board_tokens or [
-            "unity3d",
-            "automattic",
             "gitlab",
             "cloudflare",
-            "figma",
             "stripe",
-            "github",
-            "discord",
+            "canonical",
         ]
         self.timeout = timeout
 
